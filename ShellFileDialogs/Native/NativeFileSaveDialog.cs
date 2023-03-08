@@ -1,12 +1,11 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace ShellFileDialogs
+namespace ShellFileDialogs.Native
 {
-	[ComImport]
-	[Guid( ShellIIDGuid.IFileSaveDialog )]
-	[CoClass( typeof( FileSaveDialogRCW ) )]
-	internal interface NativeFileSaveDialog : IFileSaveDialog
-	{
-	}
+    [ComImport]
+    [Guid(ShellIIDGuid.IFileSaveDialog)]
+    [CoClass(typeof(FileSaveDialogRCW))]
+    internal interface NativeFileSaveDialog : IFileSaveDialog
+    {
+    }
 }

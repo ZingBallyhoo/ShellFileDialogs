@@ -1,5 +1,4 @@
 ﻿#if PROPERTIES
-
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -16,7 +15,8 @@ namespace ShellFileDialogs
 	/// Originally sourced from http://blogs.msdn.com/adamroot/pages/interop-with-propvariants-in-net.aspx
 	/// and modified to support additional types including vectors and ability to set values
 	/// </remarks>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Portability", "CA1900:ValueTypeFieldsShouldBePortable", MessageId = "_ptr2")]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Portability", "CA1900:ValueTypeFieldsShouldBePortable", MessageId
+ = "_ptr2")]
 	[StructLayout(LayoutKind.Explicit)]
 	internal sealed class PropVariant : IDisposable
 	{
@@ -27,7 +27,8 @@ namespace ShellFileDialogs
 		[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Maintainability", "CA1502:AvoidExcessiveComplexity")]
 		private static Dictionary<Type, Action<PropVariant, Array, uint>> GenerateVectorActions()
 		{
-			Dictionary<Type, Action<PropVariant, Array, uint>> cache = new Dictionary<Type, Action<PropVariant, Array, uint>>();
+			Dictionary<Type, Action<PropVariant, Array, uint>> cache =
+ new Dictionary<Type, Action<PropVariant, Array, uint>>();
 
 			cache.Add(typeof(Int16), (pv, array, i) =>
 			{
@@ -144,7 +145,8 @@ namespace ShellFileDialogs
 		}
 
 		// A dictionary and lock to contain compiled expression trees for constructors
-		private static Dictionary<Type, Func<object, PropVariant>> _cache = new Dictionary<Type, Func<object, PropVariant>>();
+		private static Dictionary<Type, Func<object, PropVariant>> _cache =
+ new Dictionary<Type, Func<object, PropVariant>>();
 		private static object _padlock = new object();
 
 		// Retrieves a cached constructor expression.

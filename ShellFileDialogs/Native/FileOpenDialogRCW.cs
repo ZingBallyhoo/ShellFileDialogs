@@ -1,13 +1,12 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace ShellFileDialogs
+namespace ShellFileDialogs.Native
 {
-	[ComImport]
-	[ClassInterface( ClassInterfaceType.None )]
-	[TypeLibType( TypeLibTypeFlags.FCanCreate )]
-	[Guid( ShellCLSIDGuid.FileOpenDialog )]
-	internal class FileOpenDialogRCW
-	{
-	}
+    [ComImport]
+    [ClassInterface(ClassInterfaceType.None)]
+    [TypeLibType(TypeLibTypeFlags.FCanCreate)]
+    [Guid(ShellCLSIDGuid.FileOpenDialog)]
+    internal class FileOpenDialogRCW
+    {
+    }
 }

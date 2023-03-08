@@ -1,12 +1,11 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace ShellFileDialogs
+namespace ShellFileDialogs.Native
 {
-	[ComImport]
-	[Guid( ShellIIDGuid.IFileOpenDialog )]
-	[CoClass( typeof( FileOpenDialogRCW ) )]
-	internal interface NativeFileOpenDialog : IFileOpenDialog
-	{
-	}
+    [ComImport]
+    [Guid(ShellIIDGuid.IFileOpenDialog)]
+    [CoClass(typeof(FileOpenDialogRCW))]
+    internal interface NativeFileOpenDialog : IFileOpenDialog
+    {
+    }
 }
