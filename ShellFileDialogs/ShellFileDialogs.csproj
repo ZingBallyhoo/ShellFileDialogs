@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
 	<PropertyGroup>
-		<TargetFrameworks>net48;netcoreapp3.1;</TargetFrameworks>
+		<TargetFrameworks>netcoreapp3.1;</TargetFrameworks>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<IncludeSymbols>true</IncludeSymbols>
 		<LangVersion>8.0</LangVersion>
@@ -12,10 +11,8 @@
 		<NoWarn>1701;1702;1591;1573;1303;</NoWarn>
 		<PackageId>Jehoel.ShellFileDialogs</PackageId>
 		<Authors>Dai Rees</Authors>
-		<SignAssembly>true</SignAssembly>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<Nullable>enable</Nullable>
-		<AssemblyOriginatorKeyFile>StrongName256.pfx</AssemblyOriginatorKeyFile>
 		<Version>1.2.0</Version>
 		<Copyright>Microsoft Corp.</Copyright>
 		<RepositoryUrl>https://github.com/Jehoel/ShellFileDialogs</RepositoryUrl>
