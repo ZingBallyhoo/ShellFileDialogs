@@ -1,28 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Globalization;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-using ShellFileDialogs.Native;
+using System.Runtime.Versioning;
+using System.Text;
+using TerraFX.Interop.Windows;
 
 namespace ShellFileDialogs
 {
-    internal static class Utility
+    [SupportedOSPlatform("windows6.0")]
+    internal static unsafe class Utility
     {
-        private static readonly Guid _ishellItem2Guid = new Guid(ShellIIDGuid.IShellItem2);
-
-        public static IReadOnlyList<string> GetFileNames(IShellItemArray items)
+        public static IReadOnlyList<string> GetFileNames(IShellItemArray* items)
         {
-            var hresult = items.GetCount(out var count);
-            if (hresult != HResult.Ok)
-                throw new Exception("IShellItemArray.GetCount failed. HResult: " +
-                                    hresult); // TODO: Will this ever happen?
+            var count = 0u;
+            var hresult = items->GetCount(&count);
+            Windows.ThrowIfFailed(hresult);
 
             var list = new List<string>((int)count);
 
             for (var i = 0; i < count; i++)
             {
-                var shellItem = GetShellItemAt(items, i);
+                using var shellItem = GetShellItemAt(items, i);
                 var fileName = GetFileNameFromShellItem(shellItem);
                 if (fileName != null) list.Add(fileName);
             }
@@ -30,44 +29,41 @@ namespace ShellFileDialogs
             return list;
         }
 
-        public static IShellItem2? ParseShellItem2Name(string value)
+        public static ComPtr<IShellItem2> ParseShellItem2Name(string value)
         {
-            var ishellItem2GuidCopy = _ishellItem2Guid;
+            var ishellItem2GuidCopy = typeof(IShellItem2).GUID;
 
-            var hresult =
-                ShellNativeMethods.SHCreateItemFromParsingName(value, IntPtr.Zero, ref ishellItem2GuidCopy,
-                    out var shellItem);
-            if (hresult == HResult.Ok) return shellItem;
-
-            // TODO: Handle HRESULT error codes?
-            return null;
-        }
-
-        public static string? GetFileNameFromShellItem(IShellItem? item)
-        {
-            if (item is null) return null;
-
-            var hr = item.GetDisplayName(ShellItemDesignNameOptions.DesktopAbsoluteParsing, out var pszString);
-            if (hr == HResult.Ok && pszString != IntPtr.Zero)
+            var pShellItem = (void*)null;
+            fixed (char* valuePtr = value)
             {
-                var fileName =
-                    Marshal.PtrToStringAuto(
-                        pszString)!; // `PtrToStringAuto` won't return `null` if its `ptr` argument is not null, which we check for.
-                Marshal.FreeCoTaskMem(pszString);
-                return fileName;
+                var hresult = Windows.SHCreateItemFromParsingName((ushort*)valuePtr, null, &ishellItem2GuidCopy, &pShellItem);
+                Windows.ThrowIfFailed(hresult);
             }
+            
+            return (IShellItem2*)pShellItem;
+        }
 
+        public static string? GetFileNameFromShellItem(IShellItem* item)
+        {
+            if (item == null) return null;
+
+            var stringChars = (ushort*)null;
+            var hr = item->GetDisplayName(SIGDN.SIGDN_DESKTOPABSOLUTEPARSING, &stringChars);
+            if (Windows.SUCCEEDED(hr) && stringChars != null)
+            {
+                return Marshal.PtrToStringUni((IntPtr)stringChars);
+            }
             return null;
         }
 
-        public static IShellItem? GetShellItemAt(IShellItemArray array, int i)
+        public static ComPtr<IShellItem> GetShellItemAt(IShellItemArray* array, int i)
         {
             if (array is null) throw new ArgumentNullException(nameof(array));
 
-            var hr = array.GetItemAt((uint)i, out var result);
-            if (hr == HResult.Ok) return result;
-
-            return null;
+            ComPtr<IShellItem> outPtr = null;
+            var hr = array->GetItemAt((uint)i, outPtr.GetAddressOf());
+            Windows.ThrowIfFailed(hr);
+            return outPtr;
         }
 
         /// <summary>Sets the file extension filters on <paramref name="dialog" />.</summary>
@@ -80,82 +76,63 @@ namespace ShellFileDialogs
         ///     0-based index of the filter in in <paramref name="filters" /> to use. If
         ///     this value is out-of-range then this method does nothing.
         /// </param>
-        public static void SetFilters(IFileDialog dialog, IReadOnlyCollection<Filter>? filters,
+        public static void SetFilters(IFileDialog* dialog, IReadOnlyList<Filter>? filters,
             int selectedFilterZeroBasedIndex)
         {
             if (dialog is null) throw new ArgumentNullException(nameof(dialog));
 
             if (filters == null || filters.Count == 0) return;
 
-            var specs = CreateFilterSpec(filters);
-            dialog.SetFileTypes((uint)specs.Length, specs);
-
-            if (selectedFilterZeroBasedIndex > -1 && selectedFilterZeroBasedIndex < filters.Count)
-                dialog.SetFileTypeIndex(1 +
-                                        (uint)selectedFilterZeroBasedIndex); // In the COM interface (like the other Windows OFD APIs), filter indexes are 1-based, not 0-based.
-        }
-
-        public static FilterSpec[] CreateFilterSpec(IReadOnlyCollection<Filter> filters)
-        {
-            var specs = new FilterSpec[filters.Count];
-            var i = 0;
+            // yes, i'm going mental insane
+            
+            var filterHeadersSize = sizeof(COMDLG_FILTERSPEC) * filters.Count;
+            var filterSpecsSize = filterHeadersSize;
             foreach (var filter in filters)
             {
-                specs[i] = filter.ToFilterSpec();
-                i++;
+                filterSpecsSize += Encoding.Unicode.GetByteCount(filter.DisplayName) + 2;
+                var filterStr = filter.ToFilterSpecString();
+                filterSpecsSize += Encoding.Unicode.GetByteCount(filterStr) + 2;
             }
-
-            return specs;
-        }
-
-        /// <summary>
-        ///     Returns <see langword="false" /> if the user cancelled-out of the dialog. Returns <see langword="true" /> if
-        ///     the user completed the dialog. All other cases result in a thrown <see cref="Win32Exception" /> or
-        ///     <see cref="ExternalException" /> depending on the HRESULT returned from <see cref="IModalWindow.Show(IntPtr)" />.
-        /// </summary>
-        public static bool ValidateDialogShowHResult(this HResult dialogHResult)
-        {
-            if (dialogHResult.TryGetWin32ErrorCode(out var win32Code))
+            
+            var filterSpecsBuf = stackalloc byte[filterSpecsSize];
+            var filterSpecsSpan = new Span<byte>(filterSpecsBuf, filterSpecsSize);
+            var headers = MemoryMarshal.Cast<byte, COMDLG_FILTERSPEC>(filterSpecsSpan.Slice(0, filterHeadersSize));
+            
+            var writeOffset = filterHeadersSize;
+            for (var i = 0; i < filters.Count; i++)
             {
-                if (win32Code == Win32ErrorCodes.Success)
-                    // OK.
-                    return true;
-
-                if (win32Code == Win32ErrorCodes.ErrorCancelled)
-                    // Cancelled
-                    return false;
-                // Other Win32 error:
-
-                var msg = string.Format(CultureInfo.CurrentCulture,
-                    "Unexpected Win32 error code 0x{0:X2} in HRESULT 0x{1:X4} returned from IModalWindow.Show(...).",
-                    (int)win32Code, (int)dialogHResult);
-                throw new Win32Exception((int)win32Code, msg);
-            }
-
-            if (dialogHResult.IsValidHResult())
-            {
-                const ushort RPC_E_SERVERFAULT = 0x0105;
-
-                if (dialogHResult.GetFacility() == HResultFacility.Rpc && dialogHResult.GetCode() == RPC_E_SERVERFAULT)
+                var filter = filters[i];
+                
+                var nameOffset = writeOffset;
+                writeOffset += Encoding.Unicode.GetBytes(filter.DisplayName, filterSpecsSpan.Slice(writeOffset));
+                filterSpecsSpan[writeOffset++] = 0;
+                filterSpecsSpan[writeOffset++] = 0;
+                
+                var filterStrOffset = writeOffset;
+                writeOffset += Encoding.Unicode.GetBytes(filter.ToFilterSpecString(), filterSpecsSpan.Slice(writeOffset));
+                filterSpecsSpan[writeOffset++] = 0;
+                filterSpecsSpan[writeOffset++] = 0;
+                
+                headers[i] = new COMDLG_FILTERSPEC
                 {
-                    // This error happens when calling `IModalWindow.Show` instead of using the `Show` method on a different interface, like `IFileOpenDialog.Show`.
-                    var msg = string.Format(CultureInfo.CurrentCulture,
-                        "Unexpected RPC HRESULT: 0x{0:X4} (RPC Error {1:X2}) returned from IModalWindow.Show(...). This particular RPC error suggests the dialog was accessed via the wrong COM interface.",
-                        (int)dialogHResult, RPC_E_SERVERFAULT);
-                    throw new ExternalException(msg, (int)dialogHResult);
-                }
-                // Fall-through to below:
+                    pszName = (ushort*)(filterSpecsBuf + nameOffset),
+                    pszSpec = (ushort*)(filterSpecsBuf + filterStrOffset)
+                };
             }
+            
+            dialog->SetFileTypes((uint)headers.Length, (COMDLG_FILTERSPEC*)filterSpecsBuf);
 
-            // Fall-through to below:
-            {
-                // Other HRESULT (non-Win32 error):
-                // https://stackoverflow.com/questions/11158379/how-can-i-throw-an-exception-with-a-certain-hresult
-
-                var msg = string.Format(CultureInfo.CurrentCulture,
-                    "Unexpected HRESULT: 0x{0:X4} returned from IModalWindow.Show(...).", (int)dialogHResult);
-                throw new ExternalException(msg, (int)dialogHResult);
-            }
+            if (selectedFilterZeroBasedIndex > -1 && selectedFilterZeroBasedIndex < filters.Count)
+                dialog->SetFileTypeIndex(1 + (uint)selectedFilterZeroBasedIndex); // In the COM interface (like the other Windows OFD APIs), filter indexes are 1-based, not 0-based.*/
+        }
+        
+        public static ComPtr<TInterface> ActivateClass<TInterface>(Guid clsid, Guid iid) where TInterface : unmanaged, IUnknown.Interface
+        {;
+            Debug.Assert(iid == typeof(TInterface).GUID);
+            var ptr = new ComPtr<TInterface>();
+            int hr = Windows.CoCreateInstance(&clsid, null, Windows.CLSCTX_SERVER, &iid, (void**)ptr.GetAddressOf());
+            Windows.ThrowIfFailed(hr);
+            return ptr;
         }
     }
 }

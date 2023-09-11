@@ -2,15 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using ShellFileDialogs.Native;
 
 namespace ShellFileDialogs
 {
     public class Filter
     {
-        private static readonly char[] _semiColon = { ';' };
-        private static readonly char[] _pipe = { '|' };
+        public string DisplayName { get; }
 
+        /// <summary>
+        ///     All extension values have their leading dot and any leading asterisk filter trimmed, so if &quot;<c>*.wav</c>
+        ///     &quot; is passed as an extension string to <see cref="Filter.Filter(string, string[])" /> then it will appear in
+        ///     this list as &quot;<c>wav</c>&quot;.
+        /// </summary>
+        public IReadOnlyList<string> Extensions { get; }
+        
         /// <summary></summary>
         /// <param name="displayName">Required. Cannot be <see langword="null" />, empty, nor whitespace.</param>
         /// <param name="extensions">
@@ -54,41 +59,7 @@ namespace ShellFileDialogs
                     nameof(extensions));
         }
 
-        public string DisplayName { get; }
-
-        /// <summary>
-        ///     All extension values have their leading dot and any leading asterisk filter trimmed, so if &quot;<c>*.wav</c>
-        ///     &quot; is passed as an extension string to <see cref="Filter.Filter(string, string[])" /> then it will appear in
-        ///     this list as &quot;<c>wav</c>&quot;.
-        /// </summary>
-        public IReadOnlyList<string> Extensions { get; }
-
-        /// <summary>Returns <see langword="null" /> if the string couldn't be parsed.</summary>
-        public static IReadOnlyList<Filter>? ParseWindowsFormsFilter(string filter)
-        {
-            // https://msdn.microsoft.com/en-us/library/system.windows.forms.filedialog.filter(v=vs.110).aspx
-            if (string.IsNullOrWhiteSpace(filter)) return null;
-
-            var components = filter.Split(_pipe, StringSplitOptions.RemoveEmptyEntries);
-            if (components.Length % 2 != 0) return null;
-
-            var filters = new Filter[components.Length / 2];
-            var fi = 0;
-            for (var i = 0; i < components.Length; i += 2)
-            {
-                var displayName = components[i];
-                var extensionsCat = components[i + 1];
-
-                var extensions = extensionsCat.Split(_semiColon, StringSplitOptions.RemoveEmptyEntries);
-
-                filters[fi] = new Filter(displayName, extensions);
-                fi++;
-            }
-
-            return filters;
-        }
-
-        private string ToFilterSpecString()
+        public string ToFilterSpecString()
         {
             var sb = new StringBuilder();
             var first = true;
@@ -102,37 +73,6 @@ namespace ShellFileDialogs
             }
 
             return sb.ToString();
-        }
-
-        private void ToExtensionList(StringBuilder sb)
-        {
-            var first = true;
-            foreach (var extension in Extensions)
-            {
-                if (!first) _ = sb.Append(", ");
-                first = false;
-
-                _ = sb.Append("*.");
-                _ = sb.Append(extension);
-            }
-        }
-
-        public override string ToString()
-        {
-            var sb = new StringBuilder();
-            _ = sb.Append(DisplayName);
-
-            _ = sb.Append(" (");
-            ToExtensionList(sb);
-            _ = sb.Append(')');
-
-            return sb.ToString();
-        }
-
-        internal FilterSpec ToFilterSpec()
-        {
-            var filter = ToFilterSpecString();
-            return new FilterSpec(DisplayName, filter);
         }
     }
 }
