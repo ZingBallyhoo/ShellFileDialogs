@@ -127,7 +127,7 @@ namespace ShellFileDialogs
         }
         
         public static ComPtr<TInterface> ActivateClass<TInterface>(Guid clsid, Guid iid) where TInterface : unmanaged, IUnknown.Interface
-        {;
+        {
             Debug.Assert(iid == typeof(TInterface).GUID);
             var ptr = new ComPtr<TInterface>();
             int hr = Windows.CoCreateInstance(&clsid, null, Windows.CLSCTX_SERVER, &iid, (void**)ptr.GetAddressOf());

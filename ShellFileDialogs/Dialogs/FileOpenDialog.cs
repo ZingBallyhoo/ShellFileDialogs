@@ -22,7 +22,7 @@ namespace ShellFileDialogs.Dialogs
             string? defaultFileName, IReadOnlyList<Filter>? filters, int? selectedFilterZeroBasedIndex,
             FILEOPENDIALOGOPTIONS flags)
         {
-            using var nfod = Utility.ActivateClass<IFileOpenDialog>(typeof(TerraFX.Interop.Windows.FileOpenDialog).GUID, typeof(IFileOpenDialog).GUID);
+            using var nfod = Utility.ActivateClass<IFileOpenDialog>(Windows.__uuidof<TerraFX.Interop.Windows.FileOpenDialog>(), Windows.__uuidof<IFileOpenDialog>());
             return ShowDialogInner(nfod, parentHWnd, title, initialDirectory, defaultFileName, filters, selectedFilterZeroBasedIndex ?? -1, flags);
         }
         
@@ -46,7 +46,7 @@ namespace ShellFileDialogs.Dialogs
                 using var initialDirectoryShellItem = Utility.ParseShellItem2Name(initialDirectory);
                 if (initialDirectoryShellItem.Get() != null)
                 {
-                    dialog->SetFolder((IShellItem*)initialDirectoryShellItem.Get());
+                    dialog->SetFolder((IShellItem*)(IShellItem2*)initialDirectoryShellItem);
                 }
             }
 
@@ -70,7 +70,7 @@ namespace ShellFileDialogs.Dialogs
             using ComPtr<IShellItemArray> arr = null; 
             dialog->GetResults(arr.GetAddressOf());
 
-            var fileNames = Utility.GetFileNames(arr.Get());
+            var fileNames = Utility.GetFileNames(arr);
             return fileNames;
         }
     }
