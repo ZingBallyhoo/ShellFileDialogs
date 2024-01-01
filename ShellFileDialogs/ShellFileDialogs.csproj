@@ -1,10 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
     <ItemGroup>
-      <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.22621.2" />
+      <PackageReference Include="PointerToolkit" Version="1.0.1" />
+      <PackageReference Include="PointerToolkit.TerraFX.Interop.Windows" Version="10.0.22621.5" />
+      <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.22621.5" />
     </ItemGroup>
 </Project>

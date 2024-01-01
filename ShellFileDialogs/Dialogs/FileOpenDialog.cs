@@ -38,7 +38,7 @@ namespace ShellFileDialogs.Dialogs
 
             fixed (char* titlePtr = title)
             {
-                if (title != null) dialog->SetTitle((ushort*)titlePtr);
+                if (title != null) dialog->SetTitle(titlePtr);
             }
 
             if (initialDirectory != null)
@@ -46,7 +46,7 @@ namespace ShellFileDialogs.Dialogs
                 using var initialDirectoryShellItem = Utility.ParseShellItem2Name(initialDirectory);
                 if (initialDirectoryShellItem.Get() != null)
                 {
-                    dialog->SetFolder((IShellItem*)(IShellItem2*)initialDirectoryShellItem);
+                    dialog->SetFolder(__cast(initialDirectoryShellItem));
                 }
             }
 
@@ -54,11 +54,11 @@ namespace ShellFileDialogs.Dialogs
             {
                 fixed (char* defaultFileNamePtr = defaultFileName)
                 {
-                    dialog->SetFileName((ushort*)defaultFileNamePtr);
+                    dialog->SetFileName(defaultFileNamePtr);
                 }
             }
 
-            Utility.SetFilters((IFileDialog*)dialog, filters, selectedFilterZeroBasedIndex);
+            Utility.SetFilters(__cast(dialog), filters, selectedFilterZeroBasedIndex);
 
             var hr = dialog->Show(parentHWnd);
             if (!Windows.SUCCEEDED(hr))

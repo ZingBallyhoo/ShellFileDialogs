@@ -1,4 +1,6 @@
-﻿using System;
+﻿global using static TerraFX.Interop.Windows.Pointers;
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -31,12 +33,10 @@ namespace ShellFileDialogs
 
         public static ComPtr<IShellItem2> ParseShellItem2Name(string value)
         {
-            var ishellItem2GuidCopy = typeof(IShellItem2).GUID;
-
             var pShellItem = (void*)null;
             fixed (char* valuePtr = value)
             {
-                var hresult = Windows.SHCreateItemFromParsingName((ushort*)valuePtr, null, &ishellItem2GuidCopy, &pShellItem);
+                var hresult = Windows.SHCreateItemFromParsingName(valuePtr, null, Windows.__uuidof<IShellItem2>(), &pShellItem);
                 Windows.ThrowIfFailed(hresult);
             }
             
@@ -47,7 +47,7 @@ namespace ShellFileDialogs
         {
             if (item == null) return null;
 
-            var stringChars = (ushort*)null;
+            var stringChars = (char*)null;
             var hr = item->GetDisplayName(SIGDN.SIGDN_DESKTOPABSOLUTEPARSING, &stringChars);
             if (Windows.SUCCEEDED(hr) && stringChars != null)
             {
@@ -85,42 +85,42 @@ namespace ShellFileDialogs
 
             // yes, i'm going mental insane
             
-            var filterHeadersSize = sizeof(COMDLG_FILTERSPEC) * filters.Count;
-            var filterSpecsSize = filterHeadersSize;
+            var filterSpecsCharCount = 0;
             foreach (var filter in filters)
             {
-                filterSpecsSize += Encoding.Unicode.GetByteCount(filter.DisplayName) + 2;
+                filterSpecsCharCount += Encoding.Unicode.GetByteCount(filter.DisplayName) + 1;
                 var filterStr = filter.ToFilterSpecString();
-                filterSpecsSize += Encoding.Unicode.GetByteCount(filterStr) + 2;
+                filterSpecsCharCount += Encoding.Unicode.GetByteCount(filterStr) + 1;
             }
             
-            var filterSpecsBuf = stackalloc byte[filterSpecsSize];
-            var filterSpecsSpan = new Span<byte>(filterSpecsBuf, filterSpecsSize);
-            var headers = MemoryMarshal.Cast<byte, COMDLG_FILTERSPEC>(filterSpecsSpan.Slice(0, filterHeadersSize));
+            var filterSpecsBuf = stackalloc char[filterSpecsCharCount];
+            var filterSpecsSpan = new Span<char>(filterSpecsBuf, filterSpecsCharCount);
+            var headers = stackalloc COMDLG_FILTERSPEC[filters.Count];
             
-            var writeOffset = filterHeadersSize;
+            var writeOffset = 0;
             for (var i = 0; i < filters.Count; i++)
             {
                 var filter = filters[i];
                 
                 var nameOffset = writeOffset;
-                writeOffset += Encoding.Unicode.GetBytes(filter.DisplayName, filterSpecsSpan.Slice(writeOffset));
-                filterSpecsSpan[writeOffset++] = 0;
-                filterSpecsSpan[writeOffset++] = 0;
+                filter.DisplayName.CopyTo(filterSpecsSpan.Slice(writeOffset));
+                writeOffset += filter.DisplayName.Length;
+                filterSpecsSpan[writeOffset++] = '\0';
                 
                 var filterStrOffset = writeOffset;
-                writeOffset += Encoding.Unicode.GetBytes(filter.ToFilterSpecString(), filterSpecsSpan.Slice(writeOffset));
-                filterSpecsSpan[writeOffset++] = 0;
-                filterSpecsSpan[writeOffset++] = 0;
+                var filterStr = filter.ToFilterSpecString();
+                filterStr.CopyTo(filterSpecsSpan.Slice(writeOffset));
+                writeOffset += filterStr.Length;
+                filterSpecsSpan[writeOffset++] = '\0';
                 
                 headers[i] = new COMDLG_FILTERSPEC
                 {
-                    pszName = (ushort*)(filterSpecsBuf + nameOffset),
-                    pszSpec = (ushort*)(filterSpecsBuf + filterStrOffset)
+                    pszName = filterSpecsBuf + nameOffset,
+                    pszSpec = filterSpecsBuf + filterStrOffset
                 };
             }
             
-            dialog->SetFileTypes((uint)headers.Length, (COMDLG_FILTERSPEC*)filterSpecsBuf);
+            dialog->SetFileTypes((uint)filters.Count, headers);
 
             if (selectedFilterZeroBasedIndex > -1 && selectedFilterZeroBasedIndex < filters.Count)
                 dialog->SetFileTypeIndex(1 + (uint)selectedFilterZeroBasedIndex); // In the COM interface (like the other Windows OFD APIs), filter indexes are 1-based, not 0-based.*/
